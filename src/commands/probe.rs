@@ -19,6 +19,10 @@ pub struct ProbeCommand {
     /// Output format
     #[arg(short, long, default_value = "table", value_parser = ["table", "json", "sarif"])]
     format: String,
+
+    /// Upload scan results to dashboard
+    #[arg(long)]
+    upload: bool,
 }
 
 impl ProbeCommand {
@@ -102,28 +106,71 @@ impl ProbeCommand {
         println!("  Risk Score:       {}", risk_score.bold());
         println!();
 
+        // Build report JSON
+        let report = serde_json::json!({
+            "scan_date": chrono::Utc::now().to_rfc3339(),
+            "project_name": std::env::current_dir()?.file_name().unwrap_or_default().to_string_lossy().to_string(),
+            "servers_found": servers.len(),
+            "total_findings": findings.len(),
+            "risk_score": risk_score,
+            "severity_breakdown": {
+                "critical": critical,
+                "high": high,
+                "medium": medium,
+                "low": low,
+            },
+            "findings": findings,
+            "servers": servers.iter().map(|s| serde_json::json!({
+                "name": s.name,
+                "transport": format!("{:?}", s.transport),
+                "command": s.command,
+                "url": s.url,
+            })).collect::<Vec<_>>(),
+        });
+
         if !findings.is_empty() {
             println!("{}", "Detailed findings saved to: krysta-report.json".dimmed());
-            
-            let report = serde_json::json!({
-                "scan_date": chrono::Utc::now().to_rfc3339(),
-                "servers_found": servers.len(),
-                "total_findings": findings.len(),
-                "severity_breakdown": {
-                    "critical": critical,
-                    "high": high,
-                    "medium": medium,
-                    "low": low,
-                },
-                "findings": findings,
-            });
             std::fs::write("krysta-report.json", serde_json::to_string_pretty(&report)?)?;
+        }
+
+        // UPLOAD TO DASHBOARD
+        if self.upload {
+            println!();
+            println!("{}", "📤 Uploading scan results to dashboard...".cyan());
+            
+            let client = reqwest::Client::new();
+            let response = client
+                .post("http://localhost:3000/api/scans")
+                .json(&report)
+                .send()
+                .await;
+            
+            match response {
+                Ok(resp) => {
+                    if resp.status().is_success() {
+                        if let Ok(json) = resp.json::<serde_json::Value>().await {
+                            println!("{}", "✅ Upload successful!".green().bold());
+                            if let Some(url) = json["url"].as_str() {
+                                println!("📊 View at: {}", url.cyan().underline());
+                            }
+                        }
+                    } else {
+                        println!("{}", format!("⚠️  Upload failed: HTTP {}", resp.status()).yellow());
+                    }
+                }
+                Err(e) => {
+                    println!("{}", format!("⚠️  Upload failed: {}", e).yellow());
+                    println!("{}", "Make sure your Next.js dev server is running on localhost:3000".dimmed());
+                }
+            }
         }
 
         println!();
         println!("{}", "Next steps:".bold());
         println!("  • View full report: cat krysta-report.json");
-        println!("  • Upgrade for remediation guides: https://krystawing.com/probe");
+        if !self.upload {
+            println!("  • Upload to dashboard: krysta-probe probe --upload");
+        }
         println!();
 
         Ok(())

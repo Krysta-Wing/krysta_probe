@@ -1,3 +1,5 @@
+pub use krysta_core::vuln_db::*;
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -47,8 +49,6 @@ impl VulnDb {
     }
 
     fn load_default_vulnerabilities(&mut self) {
-        // Real MCP vulnerabilities based on OX Security report and CVEs
-        
         self.vulnerabilities.push(Vulnerability {
             id: "CVE-2026-MCP-001".to_string(),
             severity: Severity::Critical,
@@ -56,7 +56,7 @@ impl VulnDb {
             title: "Command injection via tool description".to_string(),
             description: "MCP server allows arbitrary command execution through tool inputSchema".to_string(),
             affected_tools: vec!["execute_command".to_string(), "run_shell".to_string(), "exec".to_string()],
-            evidence_pattern: r#"("command"|"exec"|"shell").*?"type":\s*"string""#.to_string(),
+            evidence_pattern: r#"(?i)(command|exec|shell)"#.to_string(),
             remediation: "Remove execute_command tool or sandbox with strict allowlist".to_string(),
         });
 
@@ -65,9 +65,9 @@ impl VulnDb {
             severity: Severity::High,
             category: Category::PathTraversal,
             title: "Path traversal in file system tools".to_string(),
-            description: "File read/write tools lack path validation, allowing access outside workspace".to_string(),
+            description: "File read/write tools lack path validation".to_string(),
             affected_tools: vec!["read_file".to_string(), "write_file".to_string(), "list_directory".to_string()],
-            evidence_pattern: r#""path".*?"type":\s*"string"(?!.*"pattern")"#.to_string(),
+            evidence_pattern: r#""path"\s*:\s*\{"#.to_string(),
             remediation: "Add path pattern validation to inputSchema".to_string(),
         });
 
@@ -76,9 +76,9 @@ impl VulnDb {
             severity: Severity::High,
             category: Category::SSRF,
             title: "SSRF via fetch_url tool".to_string(),
-            description: "URL fetching tool allows access to internal services and metadata endpoints".to_string(),
+            description: "URL fetching tool allows access to internal services".to_string(),
             affected_tools: vec!["fetch_url".to_string(), "http_request".to_string(), "download".to_string()],
-            evidence_pattern: r#"("url"|"endpoint").*?"type":\s*"string"(?!.*"enum")"#.to_string(),
+            evidence_pattern: r#""url"\s*:\s*\{"#.to_string(),
             remediation: "Add URL allowlist or block internal IP ranges".to_string(),
         });
 
@@ -86,33 +86,77 @@ impl VulnDb {
             id: "CVE-2026-MCP-004".to_string(),
             severity: Severity::Critical,
             category: Category::CredentialExposure,
-            title: "Credential exposure in environment variables".to_string(),
-            description: "MCP server config contains hardcoded API keys or tokens".to_string(),
+            title: "Credential exposure in tool schema".to_string(),
+            description: "Tool schema contains hardcoded API keys or tokens".to_string(),
             affected_tools: vec!["*".to_string()],
-            evidence_pattern: r#"(?i)(api_key|token|secret|password|passwd)\s*[:=]\s*["'][^"']{8,}["']"#.to_string(),
-            remediation: "Use environment variable references instead of hardcoded credentials".to_string(),
+            evidence_pattern: r#"(?i)(api_key|token|secret|password)"#.to_string(),
+            remediation: "Never hardcode credentials in tool schemas".to_string(),
         });
 
         self.vulnerabilities.push(Vulnerability {
-            id: "KRYSTA-005".to_string(),
-            severity: Severity::Medium,
-            category: Category::InformationDisclosure,
-            title: "Verbose error messages leak system information".to_string(),
-            description: "Debug mode or verbose logging exposes internal paths and stack traces".to_string(),
-            affected_tools: vec!["*".to_string()],
-            evidence_pattern: r#"(?i)(debug|verbose|trace).*:.*true"#.to_string(),
-            remediation: "Disable debug mode in production".to_string(),
+            id: "CVE-2026-MCP-005".to_string(),
+            severity: Severity::Critical,
+            category: Category::CommandInjection,
+            title: "Exec/Shell injection via subprocess".to_string(),
+            description: "Server passes unsanitized input to subprocess or eval".to_string(),
+            affected_tools: vec!["execute".to_string(), "run".to_string(), "shell".to_string(), "run_script".to_string()],
+            evidence_pattern: r#"(?i)(exec|eval|subprocess|shell)"#.to_string(),
+            remediation: "Never pass user input directly to shell execution.".to_string(),
         });
 
         self.vulnerabilities.push(Vulnerability {
-            id: "KRYSTA-006".to_string(),
+            id: "CVE-2026-MCP-006".to_string(),
+            severity: Severity::Critical,
+            category: Category::CommandInjection,
+            title: "Hardening bypass via npx -c flag".to_string(),
+            description: "Malicious commands hidden inside npx -c argument".to_string(),
+            affected_tools: vec!["*".to_string()],
+            evidence_pattern: r#"(?i)-c.*?(curl|wget|bash|rm|sh)"#.to_string(),
+            remediation: "Block -c flag in npx invocations.".to_string(),
+        });
+
+        self.vulnerabilities.push(Vulnerability {
+            id: "CVE-2026-MCP-007".to_string(),
             severity: Severity::High,
-            category: Category::Authentication,
-            title: "Missing authentication on MCP endpoint".to_string(),
-            description: "MCP server accepts connections without any authentication".to_string(),
+            category: Category::ToolPoisoning,
+            title: "Tool description poisoning".to_string(),
+            description: "Malicious instructions injected into tool description".to_string(),
             affected_tools: vec!["*".to_string()],
-            evidence_pattern: r#"^(?!.*(auth|token|key|bearer)).*"#.to_string(),
-            remediation: "Implement API key or OAuth2 authentication".to_string(),
+            evidence_pattern: r#"(?i)(ignore previous|secretly|without user knowledge|exfiltrate|curl http)"#.to_string(),
+            remediation: "Validate tool descriptions against known safe patterns.".to_string(),
+        });
+
+        self.vulnerabilities.push(Vulnerability {
+            id: "CVE-2026-MCP-008".to_string(),
+            severity: Severity::Medium,
+            category: Category::ToolPoisoning,
+            title: "Unpinned server configuration".to_string(),
+            description: "MCP server uses @latest enabling supply chain attacks".to_string(),
+            affected_tools: vec!["*".to_string()],
+            evidence_pattern: r#"(?i)@latest"#.to_string(),
+            remediation: "Pin all package versions.".to_string(),
+        });
+
+        self.vulnerabilities.push(Vulnerability {
+            id: "CVE-2026-MCP-009".to_string(),
+            severity: Severity::High,
+            category: Category::NetworkExposure,
+            title: "Insecure SSE transport".to_string(),
+            description: "SSE endpoint exposed without authentication".to_string(),
+            affected_tools: vec!["*".to_string()],
+            evidence_pattern: r#"(?i)0\.0\.0\.0"#.to_string(),
+            remediation: "Never bind to 0.0.0.0 in production.".to_string(),
+        });
+
+        self.vulnerabilities.push(Vulnerability {
+            id: "CVE-2026-MCP-010".to_string(),
+            severity: Severity::High,
+            category: Category::SSRF,
+            title: "Missing auth on public SSE endpoint".to_string(),
+            description: "SSE transport URL exposed to internet without authentication".to_string(),
+            affected_tools: vec!["*".to_string()],
+            evidence_pattern: r#"(?i)https?://(?!localhost|127\.0\.0\.1)"#.to_string(),
+            remediation: "Add token enforcement or move behind API gateway.".to_string(),
         });
     }
 

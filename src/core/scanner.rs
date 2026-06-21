@@ -3,7 +3,7 @@ use serde::Deserialize;
 use regex::Regex;
 
 use crate::core::mcp::McpServer;
-use crate::core::vuln_db::{VulnDb, Vulnerability, Severity, Category};
+use crate::core::vuln_db::VulnDb;
 use crate::models::finding::Finding as ModelFinding;
 
 pub struct Scanner {
@@ -76,7 +76,15 @@ impl Scanner {
                             let schema_str = serde_json::to_string(&tool.input_schema).unwrap_or_default();
                             
                             // Check against vulnerability database
-                            let vuln_matches = self.vuln_db.check_tool(&tool.name, &schema_str);
+                            let full_context = format!(
+                                "{} {} {}",
+                                tool.name,
+                                tool.description,
+                                schema_str
+                            );
+                            // eprintln!("[DEBUG] Tool: {} | Context: {}", tool.name, &full_context[..200.min(full_context.len())]);
+                            let vuln_matches = self.vuln_db.check_tool(&tool.name, &full_context);
+                            // eprintln!("[DEBUG] Matches: {}", vuln_matches.len());
                             for vuln in vuln_matches {
                                 findings.push(ModelFinding {
                                     id: vuln.id,
@@ -84,7 +92,7 @@ impl Scanner {
                                     severity: map_severity(&vuln.severity),
                                     category: map_category(&vuln.category),
                                     description: vuln.description,
-                                    evidence: format!("Tool: {} | Pattern matched in schema", tool.name),
+                                    evidence: format!("Tool: {} | Schema: {} | Desc: {}", tool.name, schema_str, tool.description),
                                     remediation: vuln.remediation,
                                 });
                             }
@@ -117,8 +125,10 @@ impl Scanner {
                 remediation: "Validate all paths against an allowlist. Block ../ sequences.".to_string(),
             });
         }
+        findings.dedup_by(|a, b| a.id == b.id && a.title == b.title);
 
         Ok(findings)
+        
     }
 
     async fn fetch_tools(&self, url: &str) -> Result<Vec<Tool>> {
@@ -145,25 +155,25 @@ impl Scanner {
     }
 }
 
-fn map_severity(sev: &Severity) -> crate::models::finding::Severity {
+fn map_severity(sev: &crate::core::vuln_db::Severity) -> crate::models::finding::Severity {
     match sev {
-        Severity::Critical => crate::models::finding::Severity::Critical,
-        Severity::High => crate::models::finding::Severity::High,
-        Severity::Medium => crate::models::finding::Severity::Medium,
-        Severity::Low => crate::models::finding::Severity::Low,
+        crate::core::vuln_db::Severity::Critical => crate::models::finding::Severity::Critical,
+        crate::core::vuln_db::Severity::High => crate::models::finding::Severity::High,
+        crate::core::vuln_db::Severity::Medium => crate::models::finding::Severity::Medium,
+        crate::core::vuln_db::Severity::Low => crate::models::finding::Severity::Low,
     }
 }
 
-fn map_category(cat: &Category) -> crate::models::finding::Category {
+fn map_category(cat: &crate::core::vuln_db::Category) -> crate::models::finding::Category {
     match cat {
-        Category::CommandInjection => crate::models::finding::Category::CommandInjection,
-        Category::PathTraversal => crate::models::finding::Category::PathTraversal,
-        Category::Authentication => crate::models::finding::Category::Authentication,
-        Category::NetworkExposure => crate::models::finding::Category::NetworkExposure,
-        Category::InformationDisclosure => crate::models::finding::Category::InformationDisclosure,
-        Category::CredentialExposure => crate::models::finding::Category::CredentialExposure,
-        Category::SSRF => crate::models::finding::Category::SSRF,
-        Category::ToolPoisoning => crate::models::finding::Category::ToolPoisoning,
+        crate::core::vuln_db::Category::CommandInjection => crate::models::finding::Category::CommandInjection,
+        crate::core::vuln_db::Category::PathTraversal => crate::models::finding::Category::PathTraversal,
+        crate::core::vuln_db::Category::Authentication => crate::models::finding::Category::Authentication,
+        crate::core::vuln_db::Category::NetworkExposure => crate::models::finding::Category::NetworkExposure,
+        crate::core::vuln_db::Category::InformationDisclosure => crate::models::finding::Category::InformationDisclosure,
+        crate::core::vuln_db::Category::CredentialExposure => crate::models::finding::Category::CredentialExposure,
+        crate::core::vuln_db::Category::SSRF => crate::models::finding::Category::SSRF,
+        crate::core::vuln_db::Category::ToolPoisoning => crate::models::finding::Category::ToolPoisoning,
     }
 }
 

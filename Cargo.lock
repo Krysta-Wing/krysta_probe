@@ -991,6 +991,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "krysta-core"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "regex",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "krysta-probe"
 version = "0.1.0"
 dependencies = [
@@ -1001,6 +1011,7 @@ dependencies = [
  "comfy-table",
  "genpdf",
  "indicatif",
+ "krysta-core",
  "regex",
  "reqwest",
  "serde",
