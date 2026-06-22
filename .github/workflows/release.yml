@@ -36,14 +36,13 @@ jobs:
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
       
-      - name: Rename binary
-        shell: bash
-        run: |
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            cp krysta-probe/target/${{ matrix.target }}/release/krysta-probe.exe ${{ matrix.binary }}
-          else
-            cp krysta-probe/target/${{ matrix.target }}/release/krysta-probe ${{ matrix.binary }}
-          fi
+      - name: Rename binary (Unix)
+        if: matrix.os != 'windows-latest'
+        run: cp target/${{ matrix.target }}/release/krysta-probe ${{ matrix.binary }}
+
+      - name: Rename binary (Windows)
+        if: matrix.os == 'windows-latest'
+        run: cp target/${{ matrix.target }}/release/krysta-probe.exe ${{ matrix.binary }}
       
       - name: Upload to release
         uses: softprops/action-gh-release@v1
