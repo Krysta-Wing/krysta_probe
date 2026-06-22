@@ -993,6 +993,8 @@ dependencies = [
 [[package]]
 name = "krysta-core"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3cf4de6cabf104fa4b1e7454c068b0b0e3bdb76845d705ae8b14dae306327a1a"
 dependencies = [
  "chrono",
  "regex",

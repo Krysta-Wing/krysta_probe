@@ -6,3 +6,4 @@ test-mcp-config.json
 mcp_settings.json
 krysta-report.json
 *.exe" > .gitignore
+Cargo.lock
