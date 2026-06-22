@@ -35,7 +35,6 @@ jobs:
       
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
-        working-directory: krysta-probe
       
       - name: Rename binary
         shell: bash
