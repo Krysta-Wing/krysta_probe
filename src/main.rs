@@ -7,6 +7,7 @@ mod core;
 mod models;
 
 use commands::probe::ProbeCommand;
+use crate::commands::login::LoginCommand;
 
 #[derive(Parser)]
 #[command(name = "krysta-probe")]
@@ -21,6 +22,7 @@ struct Cli {
 enum Commands {
     /// Discover and scan MCP servers for vulnerabilities
     Probe(ProbeCommand),
+    Login(LoginCommand),
 }
 
 #[tokio::main]
@@ -29,6 +31,7 @@ async fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Commands::Probe(cmd) => cmd.execute().await?,
+        Commands::Login(cmd) => cmd.execute().await?,
     }
 
     Ok(())

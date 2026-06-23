@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use crate::core::mcp::McpDiscovery;
 use crate::core::scanner::Scanner;
 use crate::models::finding::{Finding, Severity};
+use crate::commands::login::get_config_path;
 
 #[derive(Args)]
 pub struct ProbeCommand {
@@ -23,6 +24,9 @@ pub struct ProbeCommand {
     /// Upload scan results to dashboard
     #[arg(long)]
     upload: bool,
+
+    #[arg(long, default_value = "https://app.krystawing.com")]
+    dashboard: String,
 }
 
 impl ProbeCommand {
@@ -71,7 +75,7 @@ impl ProbeCommand {
         Ok(())
     }
 
-    fn generate_mesh_policy(&self, findings: &[Finding]) -> String {
+    fn generate_mesh_policy(&self, findings: &[Finding], krysta_dir: &std::path::Path) -> String {
         let mut rules = Vec::new();
 
         for finding in findings {
@@ -82,16 +86,24 @@ impl ProbeCommand {
                 .unwrap_or("unknown")
                 .to_string();
 
-            if tool_hint == "unknown" {
-                continue;
-            }
-
             let action = match finding.severity {
                 crate::models::finding::Severity::Critical => "block",
                 crate::models::finding::Severity::High => "block",
                 crate::models::finding::Severity::Medium => "log",
                 crate::models::finding::Severity::Low => "log",
             };
+
+            if tool_hint == "unknown" {
+                let rule_name = format!("{}-{}", action, finding.id.to_lowercase().replace("-", "_"));
+                if rules.iter().any(|r: &String| r.contains(&rule_name)) {
+                    continue;
+                }
+                rules.push(format!(
+                    "  - name: \"{}\"\n    action: {}\n    severity: {:?}\n    condition:\n      category: \"{:?}\"\n      reason: \"{}\"",
+                    rule_name, action, finding.severity, finding.category, finding.id
+                ));
+                continue;
+            }
 
             let rule_name = format!("{}-{}", 
                 action,
@@ -157,7 +169,7 @@ impl ProbeCommand {
         println!("  🟡 Medium:       {}", medium.to_string().cyan());
         println!("  🟢 Low:          {}", low.to_string().green());
         println!();
-        println!("  Risk Score:       {}", risk_score.bold());
+        println!("  Risk :       {}", risk_score.bold());
         println!();
 
         // Build report JSON
@@ -182,9 +194,22 @@ impl ProbeCommand {
             })).collect::<Vec<_>>(),
         });
 
+        let krysta_dir = dirs::home_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("."))
+            .join(".krysta");
+
+        std::fs::create_dir_all(&krysta_dir)?;
+
         if !findings.is_empty() {
             println!("{}", "Detailed findings saved to: krysta-report.json".dimmed());
-            std::fs::write("krysta-report.json", serde_json::to_string_pretty(&report)?)?;
+            // let krysta_dir = dirs::home_dir()
+            //     .unwrap_or_else(|| std::path::PathBuf::from("."))
+            //     .join(".krysta");
+            // std::fs::create_dir_all(&krysta_dir)?;
+
+            let report_path = krysta_dir.join("krysta-report.json");
+            std::fs::write(&report_path, serde_json::to_string_pretty(&report)?)?;
+            println!("{}", format!("Detailed findings saved to: {}", report_path.display()).dimmed());
         }
 
         // UPLOAD TO DASHBOARD
@@ -193,9 +218,16 @@ impl ProbeCommand {
             println!("{}", "📤 Uploading scan results to dashboard...".cyan());
             
             let client = reqwest::Client::new();
+            let upload_url = format!("{}/api/scans", self.dashboard);
+            let config = crate::commands::login::load_config();
+            let mut upload_report = report.clone();
+            if let Some(cfg) = config {
+                upload_report["userId"] = serde_json::Value::String(cfg.user_id);
+            }
+
             let response = client
-                .post("http://localhost:3000/api/scans")
-                .json(&report)
+                .post(&upload_url)
+                .json(&upload_report)
                 .send()
                 .await;
             
@@ -228,9 +260,11 @@ impl ProbeCommand {
         println!();
 
         if !findings.is_empty() {
-            let policy = self.generate_mesh_policy(findings);
-            std::fs::write("krysta-mesh-policy.yaml", policy)?;
-            println!("{}", "Mesh policy saved to: krysta-mesh-policy.yaml".dimmed());
+            let policy = self.generate_mesh_policy(findings, &krysta_dir);
+            let policy_path = krysta_dir.join("krysta-mesh-policy.yaml");
+            std::fs::write(&policy_path, policy)?;
+            println!("{}", format!("Mesh policy saved to: {}", policy_path.display()).dimmed());
+            println!("{}", format!("Apply it: krysta-mesh start -f {}", policy_path.display()).dimmed());
             println!("{}", "Apply it: krysta-mesh start -f krysta-mesh-policy.yaml".dimmed());
             println!();
         }
