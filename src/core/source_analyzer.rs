@@ -170,8 +170,8 @@ impl SourceAnalyzer {
             let path_str = path.display().to_string();
             if path_str.contains("node_modules")
                 || path_str.contains(".git")
-                || path_str.contains("dist/")
-                || path_str.contains("build/")
+                /*|| path_str.contains("dist/")*/
+                /*|| path_str.contains("build/")*/
             {
                 continue;
             }
@@ -191,6 +191,46 @@ impl SourceAnalyzer {
 
             
             let has_tool_context = Self::has_tool_handler_context(&content, ext);
+            fn is_filesystem_call(line: &str) -> bool {
+                line.contains("fs.readFile(")
+                    || line.contains("fs.writeFile(")
+                    || line.contains("fs.readFileSync(")
+                    || line.contains("fs.writeFileSync(")
+            }
+
+            fn looks_user_controlled(line: &str) -> bool {
+                let vars = [
+                   "req.",
+                   "request.",
+                   "args.",
+                   "argv",
+                   "input.",
+                   "params.",
+                   "query.",
+                   "body.",
+                   "url",
+                   "uri",
+                   "target",
+                   "userInput",
+                   "user_input",
+                   "filename",
+                   "filepath",
+                   "path",
+                   "file",
+                ];
+
+                vars.iter().any(|v| line.contains(v))
+            }
+
+            fn is_network_call(line: &str) -> bool {
+                line.contains("fetch(")
+                    || line.contains("axios(")
+                    || line.contains("axios.get(")
+                    || line.contains("axios.post(")
+                    || line.contains("http.request(")
+                    || line.contains("https.request(")
+
+            }
 
             
             let relative_path = path.strip_prefix(root)
@@ -200,6 +240,72 @@ impl SourceAnalyzer {
 
             for (line_num, line) in content.lines().enumerate() {
                 let trimmed = line.trim();
+                if is_filesystem_call(trimmed)
+                    && has_tool_context
+                    && looks_user_controlled(trimmed) 
+                {
+                    
+
+                        finding_counter += 1;
+
+                        findings.push(Finding {
+
+                            id: format!("KRYSTA-SRC-{:03}", finding_counter),
+
+                            title: format!(
+                                "Path Traversal — Unsanitized file access in {}:{}",
+                                relative_path,
+                                line_num + 1
+                            ),
+
+                            severity: Severity::High,
+
+                            category: Category::PathTraversal,
+
+                            description:
+                                "Filesystem operation appears to use user-controlled input."
+                                .to_string(),
+
+                            evidence: format!(
+                                "File: {}:{}\nCode: {}",
+                                relative_path,
+                                line_num + 1,
+                                trimmed
+                            ),
+
+                            remediation:
+                                "Validate and canonicalize paths before filesystem access."
+                                .to_string(),
+
+                            source: FindingSource::SourceCode,
+                        });
+                        if is_network_call(trimmed)
+                           && has_tool_context
+                           && looks_user_controlled(trimmed)
+                        {
+                            finding_counter +=1;
+                            findings.push(Finding {
+                                id: format!("KRYSTA-SRC-{:03}", finding_counter),
+                                title: format!("SSRF - User-controlled outbound request in {}:{}",
+                                    relative_path,
+                                    line_num + 1
+                                ),
+                                severity: Severity::High,
+                                category: Category::SSRF,
+                                description: "Network request uses user-controlled input."
+                                       .to_string(),
+                                evidence: format!(
+                                    "File: {}:{}\nCode: {}",
+                                    relative_path,
+                                    line_num + 1,
+                                    trimmed
+                                ),
+                                remediation: "Validate destination URLs and block internal/private IP ranges." .to_string(),
+                                source: FindingSource::SourceCode
+                            });
+                        }
+                    
+                }
 
                 
                 if trimmed.starts_with("//")
@@ -211,6 +317,12 @@ impl SourceAnalyzer {
                 }
 
                 for pattern in &patterns {
+                    if pattern.category == Category::PathTraversal {
+                        continue;
+                    }
+                    if pattern.category == Category::SSRF {
+                        continue;
+                    }
                     if pattern.regex.is_match(line) {
                         finding_counter += 1;
                         let confidence = if has_tool_context && pattern.tool_context_sensitive {
@@ -294,7 +406,7 @@ impl SourceAnalyzer {
                 severity: Severity::Critical,
                 category: Category::CommandInjection,
                 regex: Regex::new(
-                    r"(?i)(child_process|execSync|exec\(|spawnSync|spawn\(|\.exec\()"
+                    r"(?i)(execSync|exec\(|spawnSync|spawn\(|\.exec\()"
                 )?,
                 tool_context_sensitive: true,
                 description: "Direct process execution found. If user-controlled input reaches this call, arbitrary commands can be executed.",
@@ -327,25 +439,15 @@ impl SourceAnalyzer {
                 severity: Severity::Critical,
                 category: Category::CommandInjection,
                 regex: Regex::new(
-                    r"\b(eval\(|exec\(|compile\()"
+                    r"(?i)b(eval\(|compile\()"
                 )?,
                 tool_context_sensitive: true,
-                description: "Dynamic Python code execution found.",
-                remediation: "Avoid eval()/exec(). Use ast.literal_eval() for safe data parsing.",
+                description: "Python exec() executes arbitrary Python code.",
+                remediation: "Avoid exec(). Use safe parsing or explicit dispatch.",
             },
 
             
-            ScanPattern {
-                title: "Path Traversal — Unsanitized file access",
-                severity: Severity::High,
-                category: Category::PathTraversal,
-                regex: Regex::new(
-                    r"(?i)(fs\.(readFile|writeFile|readFileSync|writeFileSync|rm|rmSync|unlink|unlinkSync|appendFile|createReadStream|createWriteStream))"
-                )?,
-                tool_context_sensitive: true,
-                description: "Filesystem operation found. Without path validation, directory traversal attacks are possible.",
-                remediation: "Validate paths against an allowlist of permitted directories. Resolve and check the canonical path.",
-            },
+            
             ScanPattern {
                 title: "Path Traversal — Python open",
                 severity: Severity::High,
@@ -359,17 +461,7 @@ impl SourceAnalyzer {
             },
 
             
-            ScanPattern {
-                title: "SSRF — Outbound HTTP request",
-                severity: Severity::High,
-                category: Category::SSRF,
-                regex: Regex::new(
-                    r"(?i)(fetch\(|axios\.|axios\(|http\.request|https\.request|got\(|node-fetch|undici|urllib|requests\.(get|post|put|delete|patch|head)\(|httpx\.(get|post|AsyncClient))"
-                )?,
-                tool_context_sensitive: true,
-                description: "Outbound HTTP request found. Without URL validation, an attacker can reach internal services.",
-                remediation: "Validate URLs against an allowlist. Block private/internal IP ranges (10.x, 172.16-31.x, 192.168.x, 169.254.x).",
-            },
+            
 
             
             ScanPattern {

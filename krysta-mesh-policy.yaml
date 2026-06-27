@@ -3,35 +3,5 @@ name: "krysta-auto-generated-policy"
     # Regenerate with: krysta-probe probe --deep
 
     rules:
-      - name: "block-cve_2026_mcp_002"
-    action: block
-    severity: High
-    source: "Dynamic"
-    condition:
-      tool_name: "read_file"
-      reason: "CVE-2026-MCP-002"
-
-  - name: "block-cve_2026_mcp_001"
-    action: block
-    severity: Critical
-    source: "Dynamic"
-    condition:
-      tool_name: "execute_command"
-      reason: "CVE-2026-MCP-001"
-
-  - name: "block-cve_2026_mcp_005"
-    action: block
-    severity: Critical
-    source: "Dynamic"
-    condition:
-      tool_name: "execute_command"
-      reason: "CVE-2026-MCP-005"
-
-  - name: "block-cve_2026_mcp_003"
-    action: block
-    severity: High
-    source: "Dynamic"
-    condition:
-      tool_name: "fetch_url"
-      reason: "CVE-2026-MCP-003"
+    
     

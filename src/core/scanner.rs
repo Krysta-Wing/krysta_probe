@@ -294,8 +294,9 @@ impl Scanner {
         };
 
         let mut findings = dynamic_findings;
+        use std::collections::HashSet;
+        let mut reported = HashSet::new();
 
-       
         for tool in &tools {
             let schema_str =
                 serde_json::to_string(&tool.input_schema).unwrap_or_default();
@@ -310,6 +311,10 @@ impl Scanner {
             let vuln_matches = self.vuln_db.check_tool(&tool.name, &full_context);
 
             for vuln in vuln_matches {
+                let key = format!("{}::{}", vuln.id,server.name);
+                if !reported.insert(key) {
+                    continue;
+                }
                 findings.push(Finding {
                     id: vuln.id,
                     title: format!("{} — {}", server.name, vuln.title),
@@ -419,6 +424,7 @@ impl Scanner {
         tools: &[Tool],
     ) -> Result<Vec<Finding>> {
         let mut findings = Vec::new();
+        let mut vulnerability_confirmed = false;
 
         let payloads = vec![
             ("../../Windows/win.ini", "[fonts]"),
@@ -435,6 +441,9 @@ impl Scanner {
         }).collect();
 
         for tool in &file_tools {
+            if vulnerability_confirmed {
+                break;
+            }
             
             let path_param = Self::find_param_name(tool, &["path", "file", "filename", "filepath"]);
 
@@ -474,6 +483,7 @@ impl Scanner {
                                         .to_string(),
                                 source: FindingSource::Dynamic,
                             });
+                            vulnerability_confirmed = true;
                             
                             break;
                         }
