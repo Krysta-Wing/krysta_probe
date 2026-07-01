@@ -4,24 +4,19 @@ use std::path::PathBuf;
 
 use crate::core::mcp::McpDiscovery;
 use crate::core::scanner::Scanner;
-use crate::models::finding::{Finding, Severity};
-use crate::commands::login::get_config_path;
+use crate::models::finding::{Finding, FindingSource, Severity};
 
 #[derive(Args)]
 pub struct ProbeCommand {
-    /// Path to scan (defaults to current directory)
     #[arg(short, long, default_value = ".")]
     path: PathBuf,
 
-    /// Deep scan (check tool schemas for vulnerabilities)
     #[arg(short, long)]
     deep: bool,
 
-    /// Output format
     #[arg(short, long, default_value = "table", value_parser = ["table", "json", "sarif"])]
     format: String,
 
-    /// Upload scan results to dashboard
     #[arg(long)]
     upload: bool,
 
@@ -31,10 +26,9 @@ pub struct ProbeCommand {
 
 impl ProbeCommand {
     pub async fn execute(&self) -> anyhow::Result<()> {
-        println!("{}", "🔍 Krysta Probe — Scanning for MCP servers...".bold().cyan());
+        println!("{}", " Krysta Probe Scanning for MCP servers...".bold().cyan());
         println!();
 
-        // Step 1: Discover MCP configs
         let discovery = McpDiscovery::new(&self.path);
         let servers = discovery.find_servers().await?;
 
@@ -47,29 +41,38 @@ impl ProbeCommand {
         println!("Found {} MCP server(s)", servers.len().to_string().bold());
         println!();
 
-        // Step 2: Scan each server
         let mut all_findings: Vec<Finding> = Vec::new();
         let scanner = Scanner::new();
 
         for server in &servers {
-            println!("  📡 {} ({:?})", server.name, server.transport);
+            println!("  📡 {} ({:?})", server.name.bold(), server.transport);
             
-            let findings = scanner.scan(server, self.deep).await?;
-            for finding in &findings {
-                let icon = match finding.severity {
-                    Severity::Critical => "🔴",
-                    Severity::High => "🟠",
-                    Severity::Medium => "🟡",
-                    Severity::Low => "🟢",
-                };
-                println!("    {} {}", icon, finding.title);
+            match scanner.scan(server, self.deep).await {
+                Ok(findings) => {
+                    for finding in &findings {
+                        let icon = match finding.severity {
+                            Severity::Critical => "🔴",
+                            Severity::High => "🟠",
+                            Severity::Medium => "🟡",
+                            Severity::Low => "🟢",
+                        };
+                        let source_tag = match finding.source {
+                            FindingSource::Static => "[Static]".dimmed(),
+                            FindingSource::Dynamic => "[Dynamic]".cyan(),
+                            FindingSource::SourceCode => "[Source]".magenta(),
+                            FindingSource::Package => "[Package]".blue(),
+                        };
+                        println!("    {} {} {}", icon, source_tag, finding.title);
+                    }
+                    all_findings.extend(findings);
+                }
+                Err(e) => {
+                    println!("    {} Failed to scan: {}", "⚠".yellow(), e);
+                }
             }
-            all_findings.extend(findings);
+            println!();
         }
 
-        println!();
-
-        // Step 3: Generate report
         self.generate_report(&servers, &all_findings).await?;
 
         Ok(())
@@ -86,43 +89,35 @@ impl ProbeCommand {
                 .unwrap_or("unknown")
                 .to_string();
 
-            let action = match finding.severity {
-                crate::models::finding::Severity::Critical => "block",
-                crate::models::finding::Severity::High => "block",
-                crate::models::finding::Severity::Medium => "log",
-                crate::models::finding::Severity::Low => "log",
-            };
-
             if tool_hint == "unknown" {
-                let rule_name = format!("{}-{}", action, finding.id.to_lowercase().replace("-", "_"));
-                if rules.iter().any(|r: &String| r.contains(&rule_name)) {
-                    continue;
-                }
-                rules.push(format!(
-                    "  - name: \"{}\"\n    action: {}\n    severity: {:?}\n    condition:\n      category: \"{:?}\"\n      reason: \"{}\"",
-                    rule_name, action, finding.severity, finding.category, finding.id
-                ));
                 continue;
             }
+
+            let action = match finding.severity {
+                Severity::Critical => "block",
+                Severity::High => "block",
+                Severity::Medium => "log",
+                Severity::Low => "log",
+            };
 
             let rule_name = format!("{}-{}", 
                 action,
                 finding.id.to_lowercase().replace("-", "_")
             );
 
-            // avoid duplicate rule names
             if rules.iter().any(|r: &String| r.contains(&rule_name)) {
                 continue;
             }
 
-            rules.push(format!("  - name: \"{}\"\n    action: {}\n    severity: {:?}\n    condition:\n      tool_name: \"{}\"\n      reason: \"{}\"",
+            rules.push(format!(
+                "  - name: \"{}\"\n    action: {}\n    severity: {:?}\n    source: \"{}\"\n    condition:\n      tool_name: \"{}\"\n      reason: \"{}\"",
                 rule_name,
                 action,
                 finding.severity,
+                finding.source,
                 tool_hint,
                 finding.id
             ));
-
         }
 
         format!(
@@ -147,6 +142,11 @@ impl ProbeCommand {
         let medium = findings.iter().filter(|f| f.severity == Severity::Medium).count();
         let low = findings.iter().filter(|f| f.severity == Severity::Low).count();
 
+        let static_count = findings.iter().filter(|f| f.source == FindingSource::Static).count();
+        let dynamic_count = findings.iter().filter(|f| f.source == FindingSource::Dynamic).count();
+        let source_count = findings.iter().filter(|f| f.source == FindingSource::SourceCode).count();
+        let package_count = findings.iter().filter(|f| f.source == FindingSource::Package).count();
+
         let risk_score = if critical > 0 {
             "🔴 CRITICAL"
         } else if high > 0 {
@@ -164,17 +164,24 @@ impl ProbeCommand {
         println!("  Servers Found:    {}", servers.len().to_string().bold());
         println!("  Total Findings:   {}", findings.len().to_string().bold());
         println!();
+        println!("  {}", "BY SEVERITY".bold());
         println!("  🔴 Critical:     {}", critical.to_string().red().bold());
         println!("  🟠 High:         {}", high.to_string().yellow().bold());
         println!("  🟡 Medium:       {}", medium.to_string().cyan());
         println!("  🟢 Low:          {}", low.to_string().green());
         println!();
-        println!("  Risk :       {}", risk_score.bold());
+        println!("  {}", "BY SOURCE".bold());
+        println!("  {} Static:       {}", "▪".dimmed(), static_count.to_string().bold());
+        println!("  {} Dynamic:      {}", "▪".cyan(), dynamic_count.to_string().bold());
+        println!("  {} Source Code:  {}", "▪".magenta(), source_count.to_string().bold());
+        println!("  {} Package:      {}", "▪".blue(), package_count.to_string().bold());
+        println!();
+        println!("  Risk Score:       {}", risk_score.bold());
         println!();
 
-        // Build report JSON
         let report = serde_json::json!({
             "scan_date": chrono::Utc::now().to_rfc3339(),
+            "scanner_version": env!("CARGO_PKG_VERSION"),
             "project_name": std::env::current_dir()?.file_name().unwrap_or_default().to_string_lossy().to_string(),
             "servers_found": servers.len(),
             "total_findings": findings.len(),
@@ -184,6 +191,12 @@ impl ProbeCommand {
                 "high": high,
                 "medium": medium,
                 "low": low,
+            },
+            "source_breakdown": {
+                "static": static_count,
+                "dynamic": dynamic_count,
+                "source_code": source_count,
+                "package": package_count,
             },
             "findings": findings,
             "servers": servers.iter().map(|s| serde_json::json!({
@@ -201,18 +214,11 @@ impl ProbeCommand {
         std::fs::create_dir_all(&krysta_dir)?;
 
         if !findings.is_empty() {
-            println!("{}", "Detailed findings saved to: krysta-report.json".dimmed());
-            // let krysta_dir = dirs::home_dir()
-            //     .unwrap_or_else(|| std::path::PathBuf::from("."))
-            //     .join(".krysta");
-            // std::fs::create_dir_all(&krysta_dir)?;
-
             let report_path = krysta_dir.join("krysta-report.json");
             std::fs::write(&report_path, serde_json::to_string_pretty(&report)?)?;
             println!("{}", format!("Detailed findings saved to: {}", report_path.display()).dimmed());
         }
 
-        // UPLOAD TO DASHBOARD
         if self.upload {
             println!();
             println!("{}", "📤 Uploading scan results to dashboard...".cyan());
@@ -228,6 +234,7 @@ impl ProbeCommand {
             let response = client
                 .post(&upload_url)
                 .json(&upload_report)
+                .timeout(std::time::Duration::from_secs(10))
                 .send()
                 .await;
             
@@ -265,7 +272,6 @@ impl ProbeCommand {
             std::fs::write(&policy_path, policy)?;
             println!("{}", format!("Mesh policy saved to: {}", policy_path.display()).dimmed());
             println!("{}", format!("Apply it: krysta-mesh start -f {}", policy_path.display()).dimmed());
-            println!("{}", "Apply it: krysta-mesh start -f krysta-mesh-policy.yaml".dimmed());
             println!();
         }
 

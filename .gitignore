@@ -7,3 +7,5 @@ mcp_settings.json
 krysta-report.json
 *.exe" > .gitignore
 Cargo.lock
+*.tgz
+payload.jsonl

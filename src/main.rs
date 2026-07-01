@@ -20,7 +20,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Discover and scan MCP servers for vulnerabilities
+    // Discover and scan MCP servers for vulnerabilities
     Probe(ProbeCommand),
     Login(LoginCommand),
 }

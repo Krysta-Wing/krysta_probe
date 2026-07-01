@@ -1,17 +1,15 @@
-pub use krysta_core::vuln_db::*;
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Vulnerability {
-    pub id: String,           // e.g., "CVE-2026-XXXX" or "KRYSTA-XXX"
+    pub id: String,          
     pub severity: Severity,
     pub category: Category,
     pub title: String,
     pub description: String,
-    pub affected_tools: Vec<String>,  // Tool names or patterns
-    pub evidence_pattern: String,     // Regex pattern to match in schema
+    pub affected_tools: Vec<String>,  
+    pub evidence_pattern: String,     
     pub remediation: String,
 }
 
@@ -155,7 +153,7 @@ impl VulnDb {
             title: "Missing auth on public SSE endpoint".to_string(),
             description: "SSE transport URL exposed to internet without authentication".to_string(),
             affected_tools: vec!["*".to_string()],
-            evidence_pattern: r#"(?i)https?://(?!localhost|127\.0\.0\.1)"#.to_string(),
+            evidence_pattern: r#"(?i)https?://[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"#.to_string(),
             remediation: "Add token enforcement or move behind API gateway.".to_string(),
         });
     }
@@ -164,13 +162,13 @@ impl VulnDb {
         let mut matches = Vec::new();
         
         for vuln in &self.vulnerabilities {
-            // Check if this vulnerability applies to this tool
+            
             let tool_matches = vuln.affected_tools.iter().any(|t| {
                 t == "*" || tool_name.to_lowercase().contains(&t.to_lowercase())
             });
 
             if tool_matches {
-                // Check if schema matches evidence pattern
+                
                 let regex = regex::Regex::new(&vuln.evidence_pattern);
                 if let Ok(re) = regex {
                     if re.is_match(tool_schema) {
@@ -185,5 +183,11 @@ impl VulnDb {
 
     pub fn all_vulnerabilities(&self) -> &[Vulnerability] {
         &self.vulnerabilities
+    }
+}
+
+impl Default for VulnDb {
+    fn default() -> Self {
+        Self::new()
     }
 }

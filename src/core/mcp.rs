@@ -8,11 +8,12 @@ pub struct McpServer {
     pub name: String,
     pub transport: TransportType,
     pub command: Option<String>,
+    pub args: Vec<String>,
     pub url: Option<String>,
     pub config_source: PathBuf,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TransportType {
     Stdio,
     Sse,
@@ -30,7 +31,7 @@ struct ClaudeConfig {
 struct ServerConfig {
     command: Option<String>,
     #[serde(default)]
-    args: Vec<String>,
+    pub args: Vec<String>,
     #[serde(rename = "type")]
     server_type: Option<String>,
     url: Option<String>,
@@ -79,12 +80,14 @@ impl McpDiscovery {
                                 };
 
                                 servers.push(McpServer {
-                                    name,
-                                    transport,
-                                    command: server_config.command,
-                                    url: server_config.url,
-                                    config_source: path.to_path_buf(),
+                                   name,
+                                   transport,
+                                   command: server_config.command,
+                                   args: server_config.args,
+                                   url: server_config.url,
+                                   config_source: path.to_path_buf(),
                                 });
+                                
                             }
                         }
                     }
