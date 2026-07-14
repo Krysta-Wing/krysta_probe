@@ -69,7 +69,7 @@ Prerequisites:
 - [Node.js & npm](https://nodejs.org/) (required for npm package inspections)
 
 ```bash
-cargo build --release
+cargo build
 ```
 
 The compiled binary will be available at `./target/release/krysta-probe`.

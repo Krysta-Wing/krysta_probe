@@ -440,6 +440,7 @@ impl SourceAnalyzer {
                 description: "Dynamic code evaluation found. Can lead to arbitrary code execution if user input is evaluated.",
                 remediation: "Never use eval() or new Function() with user-controlled input. Use JSON.parse() for data.",
             },
+
             ScanPattern {
                 title: "Command Injection — Python subprocess",
                 severity: Severity::Critical,
@@ -451,6 +452,7 @@ impl SourceAnalyzer {
                 description: "Python subprocess execution found. Unsanitized input can lead to command injection.",
                 remediation: "Use subprocess with shell=False and pass arguments as a list. Validate all inputs.",
             },
+
             ScanPattern {
                 title: "Command Injection — Python eval",
                 severity: Severity::Critical,
@@ -462,8 +464,6 @@ impl SourceAnalyzer {
                 description: "Python exec() executes arbitrary Python code.",
                 remediation: "Avoid exec(). Use safe parsing or explicit dispatch.",
             },
-
-            
             
             ScanPattern {
                 title: "Path Traversal — Python open",
@@ -476,10 +476,6 @@ impl SourceAnalyzer {
                 description: "Python file operation found. May allow path traversal if input is not validated.",
                 remediation: "Resolve paths with os.path.realpath() and check they fall within allowed directories.",
             },
-
-            
-            
-
             
             ScanPattern {
                 title: "Credential Exposure — Hardcoded secret",
@@ -506,7 +502,6 @@ impl SourceAnalyzer {
                 remediation: "Access only specific environment variables. Never expose the full environment.",
             },
 
-            
             ScanPattern {
                 title: "Network Exposure — Binding to all interfaces",
                 severity: Severity::High,
@@ -519,7 +514,6 @@ impl SourceAnalyzer {
                 remediation: "Bind to 127.0.0.1 for local-only access, or use a reverse proxy.",
             },
 
-            
             ScanPattern {
                 title: "Tool Poisoning — Suspicious tool description",
                 severity: Severity::Critical,

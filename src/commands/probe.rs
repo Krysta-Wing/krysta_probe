@@ -45,7 +45,7 @@ impl ProbeCommand {
         let scanner = Scanner::new();
 
         for server in &servers {
-            println!("  📡 {} ({:?})", server.name.bold(), server.transport);
+            println!("  {} ({:?})", server.name.bold(), server.transport);
             
             match scanner.scan(server, self.deep).await {
                 Ok(findings) => {
@@ -221,7 +221,7 @@ impl ProbeCommand {
 
         if self.upload {
             println!();
-            println!("{}", "📤 Uploading scan results to dashboard...".cyan());
+            println!("{}", "Uploading scan results to dashboard...".cyan());
             
             let client = reqwest::Client::new();
             let upload_url = format!("{}/api/scans", self.dashboard);
@@ -242,17 +242,17 @@ impl ProbeCommand {
                 Ok(resp) => {
                     if resp.status().is_success() {
                         if let Ok(json) = resp.json::<serde_json::Value>().await {
-                            println!("{}", "✅ Upload successful!".green().bold());
+                            println!("{}", "Upload successful!".green().bold());
                             if let Some(url) = json["url"].as_str() {
-                                println!("📊 View at: {}", url.cyan().underline());
+                                println!("View at: {}", url.cyan().underline());
                             }
                         }
                     } else {
-                        println!("{}", format!("⚠️  Upload failed: HTTP {}", resp.status()).yellow());
+                        println!("{}", format!("Upload failed: HTTP {}", resp.status()).yellow());
                     }
                 }
                 Err(e) => {
-                    println!("{}", format!("⚠️  Upload failed: {}", e).yellow());
+                    println!("{}", format!("Upload failed: {}", e).yellow());
                     println!("{}", "Make sure your Next.js dev server is running on localhost:3000".dimmed());
                 }
             }

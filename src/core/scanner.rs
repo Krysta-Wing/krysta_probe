@@ -30,7 +30,7 @@ impl Scanner {
             Ok(pkg_findings) => findings.extend(pkg_findings),
             Err(e) => {
                 eprintln!(
-                    "  ⚠ Package analysis failed for '{}': {}",
+                    "  Package analysis failed for '{}': {}",
                     server.name, e
                 );
                 
@@ -43,7 +43,7 @@ impl Scanner {
                 Ok(deep_findings) => findings.extend(deep_findings),
                 Err(e) => {
                     eprintln!(
-                        "  ⚠ Deep scan failed for '{}': {}",
+                        "  Deep scan failed for '{}': {}",
                         server.name, e
                     );
                    
@@ -205,7 +205,7 @@ impl Scanner {
                     findings.extend(src_findings);
                 }
                 Err(e) => {
-                    eprintln!("  ⚠ Local source analysis failed: {}", e);
+                    eprintln!("  Local source analysis failed: {}", e);
                 }
             }
 
@@ -232,7 +232,7 @@ impl Scanner {
                 }
             }
             Err(e) => {
-                eprintln!("  ⚠ npm view failed: {}", e);
+                eprintln!("  npm view failed: {}", e);
             }
         }
 
@@ -259,12 +259,12 @@ impl Scanner {
         match SourceAnalyzer::analyze_source(&extracted) {
             Ok(src_findings) => {
                 if !src_findings.is_empty() {
-                    println!("     🔍 Source code findings: {}", src_findings.len());
+                    println!("     Source code findings: {}", src_findings.len());
                 }
                 findings.extend(src_findings);
             }
             Err(e) => {
-                eprintln!("  ⚠ Source analysis failed: {}", e);
+                eprintln!("  Source analysis failed: {}", e);
             }
         }
 
@@ -366,7 +366,7 @@ impl Scanner {
         
         let tools = client.list_tools().await?;
 
-        println!("     🔧 Discovered {} tool(s):", tools.len());
+        println!("     Discovered {} tool(s):", tools.len());
         for tool in &tools {
             println!("        • {}", tool.name);
         }
@@ -376,22 +376,22 @@ impl Scanner {
 
         match self.test_path_traversal(&mut client, server, &tools).await {
             Ok(f) => dynamic_findings.extend(f),
-            Err(e) => eprintln!("  ⚠ Path traversal test failed: {}", e),
+            Err(e) => eprintln!("  Path traversal test failed: {}", e),
         }
 
         match self.test_command_injection(&mut client, server, &tools).await {
             Ok(f) => dynamic_findings.extend(f),
-            Err(e) => eprintln!("  ⚠ Command injection test failed: {}", e),
+            Err(e) => eprintln!("  Command injection test failed: {}", e),
         }
 
         match self.test_ssrf(&mut client, server, &tools).await {
             Ok(f) => dynamic_findings.extend(f),
-            Err(e) => eprintln!("  ⚠ SSRF test failed: {}", e),
+            Err(e) => eprintln!("  SSRF test failed: {}", e),
         }
 
         
         if let Err(e) = client.shutdown().await {
-            eprintln!("  ⚠ Server shutdown warning: {}", e);
+            eprintln!("  Server shutdown warning: {}", e);
         }
 
         Ok((tools, dynamic_findings))

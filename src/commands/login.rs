@@ -18,7 +18,7 @@ pub struct KrystaConfig {
 
 impl LoginCommand {
     pub async fn execute(&self) -> anyhow::Result<()> {
-        println!("{}", "🔐 Krysta Login".bold().cyan());
+        println!("{}", " Krysta Login".bold().cyan());
         println!();
 
         let client = reqwest::Client::new();
@@ -94,7 +94,7 @@ impl LoginCommand {
 
                     println!();
                     println!();
-                    println!("{}", "✅ Authorized!".green().bold());
+                    println!("{}", " Authorized!".green().bold());
                     println!();
 
                     // Step 4: Save config
