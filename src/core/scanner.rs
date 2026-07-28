@@ -2,6 +2,7 @@ use anyhow::Result;
 use serde::Deserialize;
 use crate::core::mcp_client::{McpClient, Tool};
 use crate::core::mcp::McpServer;
+use crate::core::vuln_db::Category::CredentialExposure;
 use crate::core::vuln_db::VulnDb;
 use crate::models::finding::{Finding, FindingSource};
 use crate::core::source_analyzer::SourceAnalyzer;
@@ -712,6 +713,7 @@ fn map_category(cat: &crate::core::vuln_db::Category) -> crate::models::finding:
         crate::core::vuln_db::Category::CredentialExposure => crate::models::finding::Category::CredentialExposure,
         crate::core::vuln_db::Category::SSRF => crate::models::finding::Category::SSRF,
         crate::core::vuln_db::Category::ToolPoisoning => crate::models::finding::Category::ToolPoisoning,
+        crate::core::vuln_db::Category::SqlInjection => crate::models::finding::Category::SqlInjection,
     }
 }
 

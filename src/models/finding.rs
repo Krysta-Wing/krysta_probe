@@ -75,6 +75,7 @@ pub enum Category {
     SSRF,
     ToolPoisoning,
     SourceCode,
+    SqlInjection,
 }
 
 impl fmt::Display for Category {
@@ -89,6 +90,7 @@ impl fmt::Display for Category {
             Category::SSRF => write!(f, "SSRF"),
             Category::ToolPoisoning => write!(f, "Tool Poisoning"),
             Category::SourceCode => write!(f, "Source Code"),
+            Category::SqlInjection => write!(f, "SQL Injection"),
         }
     }
 }

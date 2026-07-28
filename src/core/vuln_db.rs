@@ -31,6 +31,7 @@ pub enum Category {
     CredentialExposure,
     SSRF,
     ToolPoisoning,
+    SqlInjection,
 }
 
 pub struct VulnDb {
@@ -155,6 +156,17 @@ impl VulnDb {
             affected_tools: vec!["*".to_string()],
             evidence_pattern: r#"(?i)https?://[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"#.to_string(),
             remediation: "Add token enforcement or move behind API gateway.".to_string(),
+        });
+
+        self.vulnerabilities.push(Vulnerability {
+            id: "CVE-2026-MCP-011".to_string(),
+            severity: Severity::Critical,
+            category: Category::SqlInjection,
+            title: "SQL injection via raw query tool".to_string(),
+            description: "Tool accepts a raw SQL string with no parameterization or query restriction, allowing arbitrary database access.".to_string(),
+            affected_tools: vec!["query".to_string(), "execute_sql".to_string(), "run_query".to_string(), "sql".to_string()],
+            evidence_pattern: r#""(query|sql|statement)"\s*:\s*\{"#.to_string(),
+            remediation: "Use parameterized queries. Restrict raw query tools to read-only, or remove them entirely.".to_string(),
         });
     }
 
