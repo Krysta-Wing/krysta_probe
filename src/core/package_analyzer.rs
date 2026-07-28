@@ -320,6 +320,11 @@ impl PackageAnalyzer {
             r"(?i)(\\x[0-9a-f]{2}){10,}|(_0x[a-f0-9]{4,})|(\['\\x)"
         )?;
 
+        const VENDORED_SIGNATURES: &[&str] = &[
+            "ZodFirstPartyTypeKind",
+            "class ZodType",
+        ];
+
         for entry in WalkDir::new(root)
             .max_depth(10)
             .into_iter()
@@ -343,6 +348,9 @@ impl PackageAnalyzer {
                 Err(_) => continue,
             };
 
+            if VENDORED_SIGNATURES.iter().any(|sig| content.contains(sig)) {
+                continue;
+            }
             
             if obfuscation_re.is_match(&content) {
                 *counter += 1;
@@ -370,7 +378,9 @@ impl PackageAnalyzer {
             
             let line_count = content.lines().count();
             let total_len = content.len();
-            if line_count <= 3 && total_len > 50_000 {
+            let has_suspicious_naming = content.matches("_0x").count() > 5
+                || content.contains("String.fromCharCode(");
+            if line_count <= 3 && total_len > 50_000 && has_suspicious_naming {
                 *counter += 1;
                 let relative = path.strip_prefix(root)
                     .unwrap_or(path)
