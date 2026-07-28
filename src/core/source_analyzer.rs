@@ -433,9 +433,7 @@ impl SourceAnalyzer {
                 title: "Command Injection — eval/Function",
                 severity: Severity::Critical,
                 category: Category::CommandInjection,
-                regex: Regex::new(
-                    r"(?i)\b(eval\(|new\s+Function\(|setTimeout\([^,]*,|setInterval\([^,]*,)"
-                )?,
+                regex: Regex::new(r"(?i)(?:^|[^.\w])eval\(|(?:^|[^.\w])new\s+Function\(|(?:^|[^.\w])setTimeout\([^,]*,|(?:^|[^.\w])setInterval\([^,]*,")?,
                 tool_context_sensitive: true,
                 description: "Dynamic code evaluation found. Can lead to arbitrary code execution if user input is evaluated.",
                 remediation: "Never use eval() or new Function() with user-controlled input. Use JSON.parse() for data.",
