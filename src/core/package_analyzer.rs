@@ -374,7 +374,6 @@ impl PackageAnalyzer {
                     source: FindingSource::Package,
                 });
             }
-
             
             let line_count = content.lines().count();
             let total_len = content.len();

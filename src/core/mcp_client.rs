@@ -233,7 +233,10 @@ impl McpClient {
         let close_notification = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "notifications/cancelled",
-            "params": { "reason": "scanner shutting down" }
+            "params": {
+                "requestId": self.next_id.saturating_sub(1), 
+                "reason": "scanner shutting down" 
+            }
         });
         let msg = format!("{}\n", close_notification);
         if let Some(ref mut stdin) = self.stdin {
