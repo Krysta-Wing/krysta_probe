@@ -17,7 +17,7 @@ impl Default for McpClientConfig {
     fn default() -> Self {
         Self {
             connect_timeout: Duration::from_secs(15),
-            request_timeout: Duration::from_secs(10),
+            request_timeout: Duration::from_secs(25),
             shutdown_timeout: Duration::from_secs(3),
         }
     }
