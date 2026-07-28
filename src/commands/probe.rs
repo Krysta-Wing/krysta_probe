@@ -253,7 +253,7 @@ impl ProbeCommand {
                 }
                 Err(e) => {
                     println!("{}", format!("Upload failed: {}", e).yellow());
-                    println!("{}", "Make sure your Next.js dev server is running on localhost:3000".dimmed());
+                    println!("{}", "Check your network connection and that you're logged in (krysta login).".dimmed());
                 }
             }
         }
