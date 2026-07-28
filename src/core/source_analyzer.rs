@@ -205,6 +205,9 @@ impl SourceAnalyzer {
                 Err(_) => continue, 
             };
 
+            if Self::is_vendored_library(&content) {
+                continue;
+            }
             
             let has_tool_context = Self::has_tool_handler_context(&content, ext);
             fn is_filesystem_call(line: &str) -> bool {
@@ -413,6 +416,13 @@ impl SourceAnalyzer {
         }
     }
 
+    fn is_vendored_library(content: &str) -> bool {
+        const VENDORED_SIGNATURES: &[&str] = &[
+            "ZodFirstPartyTypeKind",
+            "class ZodType",
+        ];
+        VENDORED_SIGNATURES.iter().any(|sig| content.contains(sig))
+    }
     
     fn build_patterns() -> Result<Vec<ScanPattern>> {
         let patterns = vec![
@@ -433,7 +443,9 @@ impl SourceAnalyzer {
                 title: "Command Injection — eval/Function",
                 severity: Severity::Critical,
                 category: Category::CommandInjection,
-                regex: Regex::new(r"(?i)(?:^|[^.\w])eval\(|(?:^|[^.\w])new\s+Function\(|(?:^|[^.\w])setTimeout\([^,]*,|(?:^|[^.\w])setInterval\([^,]*,")?,
+                regex: Regex::new(
+                    r"(?i)(?:^|[^.\w])eval\(|(?:^|[^.\w])new\s+Function\(|(?:^|[^.\w])setTimeout\([^,]*,|(?:^|[^.\w])setInterval\([^,]*,"
+                )?,
                 tool_context_sensitive: true,
                 description: "Dynamic code evaluation found. Can lead to arbitrary code execution if user input is evaluated.",
                 remediation: "Never use eval() or new Function() with user-controlled input. Use JSON.parse() for data.",
@@ -493,7 +505,7 @@ impl SourceAnalyzer {
                 severity: Severity::Medium,
                 category: Category::InformationDisclosure,
                 regex: Regex::new(
-                    r"(?i)(process\.env|os\.environ|JSON\.stringify\(process\.env)"
+                    r"(?i)(JSON\.stringify\(\s*process\.env\s*\)|console\.log\(\s*process\.env\s*\)|\.\.\.process\.env\b|JSON\.stringify\(\s*os\.environ\s*\)|print\(\s*os\.environ\s*\)|dict\(\s*os\.environ\s*\))"
                 )?,
                 tool_context_sensitive: true,
                 description: "Bulk environment variable access found. May leak secrets if exposed through a tool.",
